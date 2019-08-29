@@ -23,7 +23,12 @@
 
 -record(proxy_info, {
       imsi       :: binary(),
+      imei       :: binary(),
       msisdn     :: binary(),
+      rat        :: binary(),
+      location   :: binary(),
+      qos        :: binary(),
       src_apn    :: [binary()],
-      ggsns = [] :: [#proxy_ggsn{}]
+      ggsns = [] :: [#proxy_ggsn{}],
+      routing_area_identity :: binary()
      }).
