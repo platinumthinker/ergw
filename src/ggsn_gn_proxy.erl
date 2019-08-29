@@ -504,10 +504,9 @@ handle_proxy_info(Request, Context, #{proxy_ds := ProxyDS}) ->
 	    lager:debug("OK Proxy Map: ~p", [lager:pr(ProxyInfo, ?MODULE)]),
 	    ProxyInfo;
 
-	Other ->
-	    lager:warning("Failed Proxy Map: ~p", [Other]),
+	{error, Cause} ->
+	    lager:warning("Failed Proxy Map: ~p", [{error, Cause}]),
 	    Type = create_pdp_context_response,
-	    Cause = user_authentication_failed,
 	    Reply = response(Type, Context, [#cause{value = Cause}], Request),
 	    throw(?CTX_ERR(?FATAL, Reply, Context))
     end.
