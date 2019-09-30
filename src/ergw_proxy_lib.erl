@@ -16,7 +16,9 @@
 -export([create_forward_session/3,
 	 modify_forward_session/5,
 	 delete_forward_session/4,
-	 query_usage_report/2]).
+	 query_usage_report/2,
+	 build_proxy_info/2
+	]).
 
 -include_lib("gtplib/include/gtp_packet.hrl").
 -include_lib("pfcplib/include/pfcp_packet.hrl").
@@ -99,6 +101,31 @@ select_proxy_sockets(#proxy_ggsn{node = Node, dst_apn = DstAPN, context = Contex
 	end,
     {ergw_gtp_socket_reg:lookup(hd(Cntl)), Candidates}.
 
+build_proxy_info(Request = #gtp{},
+  #context{apn = APN, imsi = IMSI, imei = IMEI, msisdn = MSISDN, restrictions = Restrictions}) ->
+    GGSNs = [#proxy_ggsn{dst_apn = APN, restrictions = Restrictions}],
+    LookupAPN = (catch gtp_c_lib:normalize_labels(APN)),
+    ProxyInfo = fill_proxy_info(Request),
+    ProxyInfo#proxy_info{ggsns = GGSNs, imsi = IMSI, imei = IMEI, msisdn = MSISDN, src_apn = LookupAPN}.
+
+fill_proxy_info(#gtp{version = v1,
+		      ie = #{{quality_of_service_profile, 0} := QOS,
+			     {rat_type, 0} := RATType,
+			     {routeing_area_identity, 0} := RAI,
+			     {user_location_information, 0} := LocationInfo,
+			     {gsn_address, 0} := GSNS,
+			     {gsn_address, 1} := GSNU}}) ->
+    #proxy_info{qos = encode_v1(QOS),
+		rat = encode_v1(RATType),
+		location = encode_v1(LocationInfo),
+		routeing_area_identity = encode_v1(RAI),
+		gsn_s = GSNS,
+		gsn_u = GSNU};
+fill_proxy_info(_) ->
+    #proxy_info{qos = <<>>,
+		rat = <<>>,
+		location = <<>>,
+		routeing_area_identity = <<>>}.
 %%%===================================================================
 %%% Options Validation
 %%%===================================================================
@@ -311,3 +338,30 @@ query_usage_report(Ctx, PCtx)
     IEs = [#query_urr{group = [#urr_id{id = 1}]}],
     Req = #pfcp{version = v1, type = session_modification_request, ie = IEs},
     ergw_sx_node:call(PCtx, Req, Ctx).
+
+encode_v1(#quality_of_service_profile{data = Data}) -> Data;
+encode_v1(#rat_type{rat_type = Data}) -> <<Data:8>>;
+encode_v1(#user_location_information{type = Type, mcc = MCC, mnc = MNC,
+	lac = LAC, ci = CI, sac = SAC, rac = RAC}) ->
+    [MCC1, MCC2, MCC3 | _] = [ string_to_tbcd(X) || <<X:8>> <= MCC] ++ [15,15,15],
+    [MNC1, MNC2, MNC3 | _] = [ string_to_tbcd(X) || <<X:8>> <= MNC] ++ [15,15,15],
+    Info = case Type of
+	       0 -> CI;
+	       1 -> SAC;
+	       2 -> (RAC bsl 8) bor 255;
+	       _ -> 16#ffff
+	   end,
+    <<Type:8, MCC2:4, MCC1:4, MNC3:4, MCC3:4, MNC2:4, MNC1:4, LAC:16, Info:16>>;
+encode_v1(#routeing_area_identity{mcc = MCC, mnc = MNC, lac = LAC, rac = RAC}) ->
+    [MCC1, MCC2, MCC3 | _] = [ string_to_tbcd(X) || <<X:8>> <= MCC] ++ [15,15,15],
+    [MNC1, MNC2, MNC3 | _] = [ string_to_tbcd(X) || <<X:8>> <= MNC] ++ [15,15,15],
+    <<MCC2:4, MCC1:4, MNC3:4, MCC3:4, MNC2:4, MNC1:4, LAC:16, RAC:8>>;
+encode_v1(_) -> <<>>.
+
+string_to_tbcd($*) -> 10;
+string_to_tbcd($#) -> 11;
+string_to_tbcd($a) -> 12;
+string_to_tbcd($b) -> 13;
+string_to_tbcd($c) -> 14;
+string_to_tbcd(15) -> 15;
+string_to_tbcd(BCD) -> BCD - $0.

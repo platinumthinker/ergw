@@ -30,5 +30,7 @@
       qos        :: binary(),
       src_apn    :: [binary()],
       ggsns = [] :: [#proxy_ggsn{}],
-      routing_area_identity :: binary()
+      routeing_area_identity :: binary(),
+      gsn_s,
+      gsn_u
      }).

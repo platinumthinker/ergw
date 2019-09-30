@@ -498,7 +498,7 @@ response(Cmd, Context, IEs0, #gtp{ie = #{?'Recovery' := Recovery}}) ->
     response(Cmd, Context, IEs).
 
 handle_proxy_info(Request, Context, #{proxy_ds := ProxyDS}) ->
-    ProxyInfo0 = proxy_info(Context),
+    ProxyInfo0 = ergw_proxy_lib:build_proxy_info(Request, Context),
     case ProxyDS:map(ProxyInfo0) of
 	{ok, #proxy_info{} = ProxyInfo} ->
 	    lager:debug("OK Proxy Map: ~p", [lager:pr(ProxyInfo, ?MODULE)]),
@@ -627,11 +627,6 @@ set_req_from_context(_, _K, IE) ->
 
 update_gtp_req_from_context(Context, GtpReqIEs) ->
     maps:map(set_req_from_context(Context, _, _), GtpReqIEs).
-
-proxy_info(#context{apn = APN, imsi = IMSI, imei = IMEI, msisdn = MSISDN, restrictions = Restrictions}) ->
-    GGSNs = [#proxy_ggsn{dst_apn = APN, restrictions = Restrictions}],
-    LookupAPN = (catch gtp_c_lib:normalize_labels(APN)),
-    #proxy_info{ggsns = GGSNs, imsi = IMSI, imei = IMEI, msisdn = MSISDN, src_apn = LookupAPN}.
 
 build_context_request(#context{remote_control_teid = #fq_teid{teid = TEI}} = Context,
 		      NewPeer, #gtp{type = Type, ie = RequestIEs} = Request) ->
