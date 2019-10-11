@@ -32,5 +32,7 @@
       ggsns = [] :: [#proxy_ggsn{}],
       routeing_area_identity :: binary(),
       gsn_s,
-      gsn_u
+      gsn_u,
+      pgw_address,
+      unode_address
      }).
